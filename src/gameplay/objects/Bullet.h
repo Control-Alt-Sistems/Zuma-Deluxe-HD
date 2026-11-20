@@ -34,7 +34,7 @@ void Bullet_Init(Bullet*, float, float, float, float, char);
 void Bullet_Update(Bullet*);
 void Bullet_Draw(Engine *engine, Bullet*);
 
-void BulletsArr_CollideWithChainUpdate(Engine *engine, BulletsArr*, BallChain*, SpiralDot*);
+void BulletsArr_CollideWithChainUpdate(Engine *engine, BulletsArr*, BallChain*, SpiralDot*, int spiralLen);
 void BulletsArr_UpdateOnScreenStatus(Engine *engine, BulletsArr*, int*);
 void BulletsArr_AddBullet(BulletsArr*, Frog*);
 void BulletsArr_Update(BulletsArr*);

@@ -21,12 +21,12 @@ static void LevelParser_ParseGraphics(
     levelMgr->graphicsLen++;
 
     LevelGraphics* g = &levelMgr->graphics[levelMgr->graphicsLen-1];
-    strcpy(g->id, "none");
-    strcpy(g->spiralFile, "none");
-    strcpy(g->spiral2File, "none");
-    strcpy(g->textureFile, "none");
-    strcpy(g->textureTopLayerFile, "none");
-    strcpy(g->dispName, "none");
+    SDL_strlcpy(g->id, "none", sizeof(g->id));
+    SDL_strlcpy(g->spiralFile, "none", sizeof(g->spiralFile));
+    SDL_strlcpy(g->spiral2File, "none", sizeof(g->spiral2File));
+    SDL_strlcpy(g->textureFile, "none", sizeof(g->textureFile));
+    SDL_strlcpy(g->textureTopLayerFile, "none", sizeof(g->textureTopLayerFile));
+    SDL_strlcpy(g->dispName, "none", sizeof(g->dispName));
     g->frogPos.x = 0;
     g->frogPos.y = 0;
     g->coinsLen = 0;
@@ -34,17 +34,17 @@ static void LevelParser_ParseGraphics(
 
     for (int i = 0; attribute[i]; i += 2) {
         if (strcmp(attribute[i], "id") == 0)
-            strcpy(g->id, attribute[i+1]);
+            SDL_strlcpy(g->id, attribute[i+1], sizeof(g->id));
         else if (strcmp(attribute[i], "curve") == 0)
-            strcpy(g->spiralFile, attribute[i+1]);
+            SDL_strlcpy(g->spiralFile, attribute[i+1], sizeof(g->spiralFile));
         else if (strcmp(attribute[i], "curve2") == 0)
-            strcpy(g->spiral2File, attribute[i+1]);
+            SDL_strlcpy(g->spiral2File, attribute[i+1], sizeof(g->spiral2File));
         else if (strcmp(attribute[i], "image") == 0) 
-            strcpy(g->textureFile, attribute[i+1]);
+            SDL_strlcpy(g->textureFile, attribute[i+1], sizeof(g->textureFile));
         else if (strcmp(attribute[i], "image-top") == 0)
-            strcpy(g->textureTopLayerFile, attribute[i+1]);
+            SDL_strlcpy(g->textureTopLayerFile, attribute[i+1], sizeof(g->textureTopLayerFile));
         else if (strcmp(attribute[i], "dispname") == 0)
-            strcpy(g->dispName, attribute[i+1]);
+            SDL_strlcpy(g->dispName, attribute[i+1], sizeof(g->dispName));
         else if (strcmp(attribute[i], "gx") == 0)
             g->frogPos.x = atof(attribute[i+1]);
         else if (strcmp(attribute[i], "gy") == 0)
@@ -97,7 +97,7 @@ static void LevelParser_ParseSettings(
 
     LevelSettings* s = &levelMgr->settings[levelMgr->settingsLen-1];
 
-    strcpy(s->id, "none");
+    SDL_strlcpy(s->id, "none", sizeof(s->id));
     s->ballSpd = 0.5;
     s->ballStartCount = 35;
     s->gaugeScore = 1000;
@@ -109,7 +109,7 @@ static void LevelParser_ParseSettings(
 
     for (int i = 0; attribute[i]; i += 2) {
         if (strcmp(attribute[i], "id") == 0)
-            strcpy(s->id, attribute[i+1]);
+            SDL_strlcpy(s->id, attribute[i+1], sizeof(s->id));
         else if (strcmp(attribute[i], "speed") == 0)
             s->ballSpd = atof(attribute[i+1]);
         else if (strcmp(attribute[i], "start") == 0)
@@ -239,18 +239,14 @@ int LevelMgr_LoadLevels(LevelMgr *levelMgr, const char* fileName) {
     levelMgr->survivalLevels = NULL;
     levelMgr->survivalLevelsLen = 0;
 
-    for (int i = 0; i < 11; i++) {
-        for (int j = 0; j < 11; j++) {
-            levelMgr->bestScore[i][j] = 0;
-            levelMgr->bestTime[i][j]  = 0;
-        }
-    }
+    SDL_memset(levelMgr->bestScore, 0, sizeof(levelMgr->bestScore));
+    SDL_memset(levelMgr->bestTime, 0, sizeof(levelMgr->bestTime));
 
     int done;
 
-    char path[256];
+    char path[512];
     char* basePath = SDL_GetBasePath();
-    sprintf(path, "%s%s/%s", basePath, PATH_LEVEL, fileName);
+    SDL_snprintf(path, sizeof(path), "%s%s/%s", basePath ? basePath : "", PATH_LEVEL, fileName);
     SDL_free(basePath);
 
     char* buff = malloc(XML_BUFF_SIZE);
@@ -431,100 +427,130 @@ void LevelMgr_Free(LevelMgr *levelMgr) {
 ////////////////////////////////////
 ////////////////////////////////////
 
+/* the longest path a level may have; the original ones have 2500 to 3700 steps */
+#define SPIRAL_MAX_LEN 100000
+#define CURVE_CONTROL_POINT_SIZE 10
+
+/* reads a curve file (.dat): "CURV", version, flags, size of the control point block,
+   control point count and the control points (skipped), then the point count, the start
+   point and one step per point (t1, t2, dx and dy in hundredths, signed). Little-endian. */
+static int Level_LoadSpiral(const char* path, SDL_FPoint* start, SpiralDot** spiral, int* spiralLen) {
+    *spiral = NULL;
+    *spiralLen = 0;
+
+    SDL_RWops* rw = SDL_RWFromFile(path, "rb");
+    if (!rw) {
+        Engine_PushErrorFile(path, "Could not open file.");
+        return 0;
+    }
+
+    Sint64 fileSize = SDL_RWsize(rw);
+    char magic[4];
+    if (fileSize < 0x14 || SDL_RWread(rw, magic, 1, 4) != 4 || SDL_memcmp(magic, "CURV", 4) != 0) {
+        Engine_PushErrorFile(path, "Not a curve file.");
+        SDL_RWclose(rw);
+        return 0;
+    }
+
+    SDL_RWseek(rw, 0x10, RW_SEEK_SET);
+    Sint32 controlCount = (Sint32)SDL_ReadLE32(rw);
+    Sint64 pointsOffset = 0x14 + (Sint64)controlCount * CURVE_CONTROL_POINT_SIZE;
+    if (controlCount < 0 || pointsOffset + 12 > fileSize) {
+        Engine_PushErrorFile(path, "The file is damaged.");
+        SDL_RWclose(rw);
+        return 0;
+    }
+
+    SDL_RWseek(rw, pointsOffset, RW_SEEK_SET);
+    Sint32 pointCount = (Sint32)SDL_ReadLE32(rw);
+    Uint32 bits = SDL_ReadLE32(rw);
+    SDL_memcpy(&start->x, &bits, sizeof(float));
+    bits = SDL_ReadLE32(rw);
+    SDL_memcpy(&start->y, &bits, sizeof(float));
+
+    int len = pointCount - 1;
+    if (len < 1 || len > SPIRAL_MAX_LEN || pointsOffset + 12 + (Sint64)len * 4 > fileSize) {
+        Engine_PushErrorFile(path, "The file is damaged.");
+        SDL_RWclose(rw);
+        return 0;
+    }
+
+    Uint8* raw = malloc((size_t)len * 4);
+    SpiralDot* dots = malloc(sizeof(SpiralDot) * (size_t)len);
+    if (!raw || !dots || SDL_RWread(rw, raw, 4, (size_t)len) != (size_t)len) {
+        Engine_PushErrorFile(path, raw && dots ? "The file is damaged." : "Out of memory!");
+        free(raw);
+        free(dots);
+        SDL_RWclose(rw);
+        return 0;
+    }
+    SDL_RWclose(rw);
+
+    for (int i = 0; i < len; i++) {
+        dots[i].t1 = raw[i * 4] != 0;
+        dots[i].t2 = raw[i * 4 + 1] != 0;
+        /* signed on every platform (plain char is unsigned on ARM Linux) */
+        dots[i].dx = (float)(Sint8)raw[i * 4 + 2] / 100.0f;
+        dots[i].dy = (float)(Sint8)raw[i * 4 + 3] / 100.0f;
+    }
+    free(raw);
+
+    *spiral = dots;
+    *spiralLen = len;
+    return 1;
+}
+
 int Level_Load(LevelMgr *levelMgr, Engine *engine, Level* level) {
-    int ok = 1;
+    LevelGraphics* g = &levelMgr->graphics[level->graphicsID];
 
-    char path[256];
-
-    char* basePath = SDL_GetBasePath();
-
-    sprintf(
-        path, 
-        "%s%s/%s/%s.jpg", 
-        basePath,
-        PATH_LEVEL,
-        levelMgr->graphics[level->graphicsID].id,
-        levelMgr->graphics[level->graphicsID].textureFile
-    );
-    level->texture = Engine_TextureLoad(engine, path); 
-    if (!level->texture) {
-        ok = 0;
-        return ok;
-    }
-
+    level->texture = NULL;
     level->textureTopLayer = NULL;
-    if (!(strcmp(levelMgr->graphics[level->graphicsID].textureTopLayerFile, "none") == 0)) {
-        sprintf(
-            path, 
-            "%s%s/%s/%s.png", 
-            basePath,
-            PATH_LEVEL,
-            levelMgr->graphics[level->graphicsID].id,
-            levelMgr->graphics[level->graphicsID].textureTopLayerFile
-        );
-        level->textureTopLayer = Engine_TextureLoad(engine, path); 
-    }
-
+    level->spiral = NULL;
+    level->spiralLen = 0;
     level->spiral2 = NULL;
-    
-    sprintf(
-        path, 
-        "%s%s/%s/%s.dat",
-        basePath, 
-        PATH_LEVEL,
-        levelMgr->graphics[level->graphicsID].id,
-        levelMgr->graphics[level->graphicsID].spiralFile
-    );
-    FILE* file = fopen(path, "rb");
-    if (!file) {
-        ok = 0;
-        goto end;
+    level->spiral2Len = 0;
+
+    char path[512];
+    char* basePath = SDL_GetBasePath();
+    const char* base = basePath ? basePath : "";
+
+    SDL_snprintf(path, sizeof(path), "%s%s/%s/%s.jpg", base, PATH_LEVEL, g->id, g->textureFile);
+    level->texture = Engine_TextureLoad(engine, path);
+
+    if (level->texture && strcmp(g->textureTopLayerFile, "none") != 0) {
+        SDL_snprintf(path, sizeof(path), "%s%s/%s/%s.png", base, PATH_LEVEL, g->id, g->textureTopLayerFile);
+        level->textureTopLayer = Engine_TextureLoad(engine, path);
     }
 
-    fseek(file, 0x10, SEEK_SET);
-    int count;
-    fread(&count, sizeof(int), 1, file);
-    fseek(file, 0x14 + count * 10, SEEK_SET);
-
-    int c;
-    float cx, cy;
-
-    fread(&c, sizeof(int), 1, file);
-    fread(&cx, sizeof(float), 1, file);
-    fread(&cy, sizeof(float), 1, file);
-
-    level->spiralStart.x = cx;
-    level->spiralStart.y = cy;
-
-    level->spiralLen = c-1;
-    level->spiral = malloc(sizeof(SpiralDot) * level->spiralLen);
-
-    int i;
-    for (i = 0; i < level->spiralLen; i++) {
-        char t1, t2, x, y;
-        fread(&t1, 1, 1, file);
-        fread(&t2, 1, 1, file);
-        fread(&x, 1, 1, file);
-        fread(&y, 1, 1, file);
-
-        level->spiral[i].t1 = t1;
-        level->spiral[i].t2 = t2;
-        level->spiral[i].dx = (float)x / 100.0;
-        level->spiral[i].dy = (float)y / 100.0;
+    int ok = level->texture != NULL;
+    if (ok) {
+        SDL_snprintf(path, sizeof(path), "%s%s/%s/%s.dat", base, PATH_LEVEL, g->id, g->spiralFile);
+        ok = Level_LoadSpiral(path, &level->spiralStart, &level->spiral, &level->spiralLen);
     }
 
-end:
-    fclose(file);
+    SDL_free(basePath);
+
+    if (!ok)
+        Level_Free(level);
 
     return ok;
 }
 
 void Level_Free(Level* level) {
-    SDL_DestroyTexture(level->texture);
-    SDL_DestroyTexture(level->textureTopLayer);
+    if (level->texture)
+        SDL_DestroyTexture(level->texture);
+    if (level->textureTopLayer)
+        SDL_DestroyTexture(level->textureTopLayer);
 
     free(level->spiral);
     free(level->spiral2);
+
+    level->texture = NULL;
+    level->textureTopLayer = NULL;
+    level->spiral = NULL;
+    level->spiral2 = NULL;
+    level->spiralLen = 0;
+    level->spiral2Len = 0;
 }
 
 void Level_Draw(Engine *engine, Level* lvl) {
@@ -589,29 +615,29 @@ void Level_DrawDebug(LevelMgr *levelMgr, Engine *engine, Level* lvl) {
 }
 
 char* Level_GetInfo(LevelMgr *levelMgr, Level* lvl) {
-    char* info = malloc(512);
+    const size_t size = 1024;
+    char* info = malloc(size);
+    if (!info)
+        return NULL;
 
-    sprintf(info, " *- Graphics -*\n");
     LevelGraphics* g = LevelMgr_GetLevelGraphics(levelMgr, lvl);
-    sprintf(info, "%s id: %s\n", info, g->id);
-    sprintf(info, "%s dispName: %s\n", info, g->dispName);
-    sprintf(info, "%s spiral: %s\n", info, g->spiralFile);
-    sprintf(info, "%s spiral2: %s\n", info, g->spiral2File);
-    sprintf(info, "%s texture: %s\n", info, g->textureFile);
-    sprintf(info, "%s top texture: %s\n", info, g->textureTopLayerFile);
-    sprintf(info, "%s frog x: %lg; y: %lg\n\n", info, g->frogPos.x, g->frogPos.y);
+    int n = SDL_snprintf(info, size,
+        " *- Graphics -*\n"
+        " id: %s\n dispName: %s\n spiral: %s\n spiral2: %s\n"
+        " texture: %s\n top texture: %s\n frog x: %g; y: %g\n\n",
+        g->id, g->dispName, g->spiralFile, g->spiral2File,
+        g->textureFile, g->textureTopLayerFile, g->frogPos.x, g->frogPos.y);
 
-    sprintf(info, "%s *- Settings -*\n", info);
     LevelSettings* s = LevelMgr_GetLevelSettings(levelMgr, lvl, 0);
-    sprintf(info, "%s id: %s\n", info, s->id);
-    sprintf(info, "%s part time: %d\n", info, s->partTime);
-    sprintf(info, "%s repeat chance: %d\n", info, s->repeatChance);
-    sprintf(info, "%s single chance: %d\n", info, s->singleChance);
-    sprintf(info, "%s slow factor: %f\n", info, s->slowFactor);
-    sprintf(info, "%s balls colors: %d\n", info, s->ballColors);
-    sprintf(info, "%s balls spd: %f\n", info, s->ballSpd);
-    sprintf(info, "%s balls start count: %d\n", info, s->ballStartCount);
-    sprintf(info, "%s score: %d\n", info, s->gaugeScore);
+    if (s && n >= 0 && (size_t)n < size) {
+        SDL_snprintf(info + n, size - (size_t)n,
+            " *- Settings -*\n"
+            " id: %s\n part time: %d\n repeat chance: %d\n single chance: %d\n"
+            " slow factor: %f\n balls colors: %d\n balls spd: %f\n"
+            " balls start count: %d\n score: %d\n",
+            s->id, s->partTime, s->repeatChance, s->singleChance,
+            s->slowFactor, s->ballColors, s->ballSpd, s->ballStartCount, s->gaugeScore);
+    }
 
     return info;
 }

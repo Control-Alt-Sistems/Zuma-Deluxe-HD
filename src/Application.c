@@ -106,8 +106,10 @@ static void ApplicationZuma_Tick(LevelMgr *levelMgr, Engine *engine, App *app) {
     MenuMgr_Animate(&app->menuMgr);
 
     if (app->menuMgr.roomID == MR_GAME && app->inMenu) {
-      app->inMenu = 0;
-      Game_Init(levelMgr, engine, &app->game, app->curLvl, app->curDifficulty);
+      if (Game_Init(levelMgr, engine, &app->game, app->curLvl, app->curDifficulty))
+        app->inMenu = 0;
+      else
+        MenuMgr_Set(engine, &app->menuMgr, MR_GAUNTLET); /* the level files are missing or damaged */
     }
   } else {
     Game_Update(levelMgr, engine, &app->game, &app->inMenu, app->mouseClicked);
