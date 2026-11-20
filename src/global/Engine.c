@@ -2,6 +2,7 @@
 #include "SDL_log.h"
 #include "SDL_pixels.h"
 #include "SDL_stdinc.h"
+#include <ctype.h>
 #include <string.h>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -51,6 +52,8 @@ int Engine_Init(Engine *engine) {
     engine->render = NULL;
     engine->textures = NULL;
     engine->texturesLen = 0;
+    engine->fonts = NULL;
+    engine->fontsLen = 0;
 
     engine->fullScr = false;
 
@@ -180,21 +183,23 @@ int Engine_TexturesLoad(Engine *engine, const char** files, int n) {
 
     char path[256];
     for (int i = 0; i < n; i++) {
-        if (SDL_snprintf(path, sizeof(path), "%s%s/%s", basePath, TEXTURE_FOLDER, files[i]) >= sizeof(path)) {
+        if (SDL_snprintf(path, sizeof(path), "%s%s/%s", basePath ? basePath : "", TEXTURE_FOLDER, files[i]) >= (int)sizeof(path)) {
             Engine_PushError("Critical Error!", "Texture path too long");
+            SDL_free(basePath);
             return 0;
         }
 
         engine->textures[i] = Engine_TextureLoad(engine, path);
 
         if (!engine->textures[i]) {
+            SDL_free(basePath);
             return 0;
         }
+
+        engine->texturesLen = i + 1;
     }
 
     SDL_free(basePath);
-
-    engine->texturesLen = n;
 
     return 1;
 }
@@ -228,55 +233,66 @@ Font* Engine_FontLoad(Engine *engine, const char* fileName) {
     char path[256];
 
     char* basePath = SDL_GetBasePath();
+    const char* base = basePath ? basePath : "";
 
-    sprintf(path, "%s%s/%s.png", basePath, FONT_FOLDER, fileName);
+    SDL_snprintf(path, sizeof(path), "%s%s/%s.png", base, FONT_FOLDER, fileName);
     font->texture = Engine_TextureLoad(engine, path);
     if (!font->texture) {
-        Engine_PushErrorFile(path, "");
+        SDL_free(basePath);
+        Engine_FontFree(font);
         return NULL;
     }
 
-    sprintf(path, "%s%s/%s.txt", basePath, FONT_FOLDER, fileName);
+    SDL_snprintf(path, sizeof(path), "%s%s/%s.txt", base, FONT_FOLDER, fileName);
+    SDL_free(basePath);
+
     FILE* file = fopen(path, "r");
     if (!file) {
-        Engine_PushErrorFile(path, "");
+        Engine_PushErrorFile(path, "Could not open file.");
+        Engine_FontFree(font);
         return NULL;
     }
-
-    SDL_free(basePath);
 
     int n;
     int errFlag = 0;
     char str[64];
 
-    while(fscanf(file, "%s", str) != EOF) {
-        if (!fscanf(file, "%d", &n))
+    while(fscanf(file, "%63s", str) == 1) {
+        if (fscanf(file, "%d", &n) != 1)
+            {errFlag = 1; break;}
+
+        /* unknown sections (e.g. OutlineRectList) are skipped two tokens at a time,
+           so only a real section name must have a non-negative count */
+        if (n < 0 && isalpha((unsigned char)str[0]))
             {errFlag = 1; break;}
 
         if (strcmp(str, "CharList") == 0) {
+            free(font->chars);
             font->chars = (char*)malloc(sizeof(char) * n);
-            if (!font->chars)
+            if (n > 0 && !font->chars)
                 {errFlag = 1; break;}
 
             font->charsLen = n;
             for (int i = 0; i < n; i++) {
                 char temp;
-                if (!fscanf(file, " %c", &temp)) {errFlag = 1; break;}
+                if (fscanf(file, " %c", &temp) != 1) {errFlag = 1; break;}
                 font->chars[i] = temp;
             }
         } else if (strcmp(str, "WidthList") == 0) {
+            free(font->widthList);
             font->widthList = malloc(sizeof(int) * n);
-            if (!font->widthList)
+            if (n > 0 && !font->widthList)
                 {errFlag = 1; break;}
 
             for (int i = 0; i < n; i++) {
                 int temp;
-                if (!fscanf(file, "%d", &temp)) {errFlag = 1; break;}
+                if (fscanf(file, "%d", &temp) != 1) {errFlag = 1; break;}
                 font->widthList[i] = temp;
             }
         } else if (strcmp(str, "RectList") == 0) {
+            free(font->rectList);
             font->rectList = malloc(sizeof(SDL_Rect) * n);
-            if (!font->rectList)
+            if (n > 0 && !font->rectList)
                 {errFlag = 1; break;}
 
             for (int i = 0; i < n; i++) {
@@ -287,8 +303,9 @@ Font* Engine_FontLoad(Engine *engine, const char* fileName) {
                 font->rectList[i] = temp;
             }
         } else if (strcmp(str, "OffsetList") == 0) {
+            free(font->offsetList);
             font->offsetList = malloc(sizeof(SDL_Point) * n);
-            if (!font->offsetList)
+            if (n > 0 && !font->offsetList)
                 {errFlag = 1; break;}
 
             for (int i = 0; i < n; i++) {
@@ -298,35 +315,44 @@ Font* Engine_FontLoad(Engine *engine, const char* fileName) {
                 font->offsetList[i] = temp;
             }
         } else if (strcmp(str, "KerningPairs") == 0) {
-            font->kerningPairs = malloc(sizeof(font->kerningPairs) * n);
-            if (!font->kerningPairs)
+            free(font->kerningPairs);
+            font->kerningPairs = malloc(sizeof(*font->kerningPairs) * n);
+            if (n > 0 && !font->kerningPairs)
                 {errFlag = 1; break;}
 
             font->kerningPairsLen = n;
 
             for (int i = 0; i < n; i++) {
                 char temp[10];
-                if (!fscanf(file, "%s", &temp)) {errFlag = 1; break;}
+                if (fscanf(file, "%9s", temp) != 1) {errFlag = 1; break;}
                 font->kerningPairs[i].ch[0] = temp[0];
-                font->kerningPairs[i].ch[1] = temp[1];
+                font->kerningPairs[i].ch[1] = temp[0] ? temp[1] : '\0';
             }
         } else if (strcmp(str, "KerningValues") == 0) {
+            free(font->kerningValues);
             font->kerningValues = malloc(sizeof(int) * n);
-            if (!font->kerningValues)
+            if (n > 0 && !font->kerningValues)
                 {errFlag = 1; break;}
 
             for (int i = 0; i < n; i++) {
                 int temp;
-                if (!fscanf(file, "%d", &temp)) {errFlag = 1; break;}
+                if (fscanf(file, "%d", &temp) != 1) {errFlag = 1; break;}
                 font->kerningValues[i] = temp;
             }
         }
+
+        if (errFlag)
+            break;
     }
     fclose(file);
 
+    /* every list is indexed by the char index, so all of them must be there */
+    if (!errFlag && (!font->chars || !font->widthList || !font->rectList || !font->offsetList))
+        errFlag = 1;
+
     if (errFlag) {
-        free(font);
-        Engine_PushErrorFile(fileName, "");
+        Engine_PushErrorFile(path, "Invalid font file.");
+        Engine_FontFree(font);
         return NULL;
     }
 
@@ -334,7 +360,11 @@ Font* Engine_FontLoad(Engine *engine, const char* fileName) {
 }
 
 void Engine_FontFree(Font* font) {
-    SDL_DestroyTexture(font->texture);
+    if (!font)
+        return;
+
+    if (font->texture)
+        SDL_DestroyTexture(font->texture);
     free(font->chars);
     free(font->widthList);
     free(font->rectList);
@@ -346,7 +376,7 @@ void Engine_FontFree(Font* font) {
 }
 
 int Engine_FontsLoad(Engine *engine, const char** files, int n) {
-    engine->fonts = malloc(sizeof(Font) * n);
+    engine->fonts = malloc(sizeof(Font*) * n);
     if (!engine->fonts) {
         Engine_PushError("Critical Error!", "Out of memory.");
         return 0;
@@ -356,8 +386,8 @@ int Engine_FontsLoad(Engine *engine, const char** files, int n) {
         engine->fonts[i] = Engine_FontLoad(engine, files[i]);
         if (!engine->fonts[i])
             return 0;
+        engine->fontsLen = i + 1;
     }
-    engine->fontsLen = n;
 
     return 1;
 }
@@ -691,9 +721,8 @@ int Engine_LoadSettings(Engine *engine) {
         return 1;
     }
 
-    char buff[11];
-    fscanf(file, "%s", buff);
-    if (strcmp(buff, "MUSIC") != 0) {
+    char buff[11] = "";
+    if (fscanf(file, "%10s", buff) != 1 || strcmp(buff, "MUSIC") != 0) {
         Engine_PushError("Failed to load \"settings.txt\"",
             "Invalid file format!");
         fclose(file);
@@ -710,8 +739,7 @@ int Engine_LoadSettings(Engine *engine) {
         return 0;
     }
 
-    fscanf(file, "%s", buff);
-    if (strcmp(buff, "SOUNDS") != 0) {
+    if (fscanf(file, "%10s", buff) != 1 || strcmp(buff, "SOUNDS") != 0) {
         Engine_PushError("Failed to load \"settings.txt\"",
             "Invalid file format!");
         fclose(file);
@@ -729,8 +757,7 @@ int Engine_LoadSettings(Engine *engine) {
         return 0;
     }
 
-    fscanf(file, "%s", buff);
-    if (strcmp(buff, "FULLSCREEN") != 0) {
+    if (fscanf(file, "%10s", buff) != 1 || strcmp(buff, "FULLSCREEN") != 0) {
         Engine_PushError("Failed to load \"settings.txt\"",
             "Invalid file format!");
         fclose(file);
@@ -751,5 +778,6 @@ int Engine_LoadSettings(Engine *engine) {
         return 0;
     }
 
+    fclose(file);
     return 1;
 }

@@ -51,13 +51,15 @@ static int ApplicationZuma_LoadResources(LevelMgr *levelMgr, Engine *engine) {
 
   if (!LevelMgr_LoadLevels(levelMgr, "levels.xml"))
     return 8;
+
+  return 0;
 }
 
 static int ApplicationZuma_ShowStartupImage(Engine *engine) {
   char *basePath = SDL_GetBasePath();
 
-  char resPath[100];
-  sprintf(resPath, "%simages/disclaimer.jpg", basePath);
+  char resPath[512];
+  SDL_snprintf(resPath, sizeof(resPath), "%simages/disclaimer.jpg", basePath ? basePath : "");
 
   SDL_free(basePath);
 
@@ -68,6 +70,9 @@ static int ApplicationZuma_ShowStartupImage(Engine *engine) {
   SDL_RenderCopy(engine->render, texDisc, NULL, NULL);
   SDL_RenderPresent(engine->render);
   SDL_Delay(2000);
+
+  SDL_DestroyTexture(texDisc);
+  return 0;
 }
 
 static void ApplicationZuma_HandleEvents(App *app) {
@@ -77,7 +82,7 @@ static void ApplicationZuma_HandleEvents(App *app) {
   while (SDL_PollEvent(&e) != 0) {
     switch (e.type) {
     case SDL_QUIT:
-      exit(0);
+      app->isRunning = false;
       break;
     case SDL_MOUSEBUTTONDOWN:
 
@@ -128,8 +133,17 @@ int ApplicationZuma_Start(void) {
   if (!Engine_CreateWindow(&engine, "Zuma HD. By GalaxyShad and s4lat", WINDOW_WIDTH, WINDOW_HEIGHT))
     return 2;
 
-  ApplicationZuma_ShowStartupImage(&engine);
-  ApplicationZuma_LoadResources(&levelMgr, &engine);
+  int err = ApplicationZuma_ShowStartupImage(&engine);
+  if (err) {
+    Engine_Destroy(&engine);
+    return err;
+  }
+
+  err = ApplicationZuma_LoadResources(&levelMgr, &engine);
+  if (err) {
+    Engine_Destroy(&engine);
+    return err;
+  }
 
   srand(time(NULL));
 
