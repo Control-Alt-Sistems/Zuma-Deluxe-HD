@@ -1132,7 +1132,13 @@ void MenuMgr_Update(Engine *engine, MenuMgr* m) {
                 m->inDialog = true;
                 break;
             case 4: break;          /* TODO NEVER GONNA GIVE YOU UP */
-            case 5: exit(0); break; 
+            case 5: {
+                /* same path as closing the window: the main loop ends and frees everything */
+                SDL_Event quit;
+                quit.type = SDL_QUIT;
+                SDL_PushEvent(&quit);
+                break;
+            }
         }
     } else if (m->roomID == MR_GAUNTLET) {
         switch(Menu_GetButton(m->room)) {
