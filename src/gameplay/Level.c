@@ -298,8 +298,13 @@ int LevelMgr_LoadLevels(LevelMgr *levelMgr, const char* fileName) {
     return 1;
 }
 
+#define PROGRESS_FILE "progress.bin"
+
 int LevelMgr_SaveProgress(LevelMgr *levelMgr) {
-    FILE* file = fopen("progress.bin", "wb");
+    char path[512];
+    Engine_GetSavePath(path, sizeof(path), PROGRESS_FILE);
+
+    FILE* file = fopen(path, "wb");
     if (!file) {
         return 0;
     }
@@ -319,7 +324,19 @@ int LevelMgr_SaveProgress(LevelMgr *levelMgr) {
 }
 
 int LevelMgr_LoadProgress(LevelMgr *levelMgr) {
-    FILE* file = fopen("progress.bin", "rb");
+    char path[512];
+    Engine_GetSavePath(path, sizeof(path), PROGRESS_FILE);
+
+    FILE* file = fopen(path, "rb");
+
+    /* older versions saved progress.bin in the current folder: read it once,
+       the save at the end writes it to the new place */
+    bool migrating = false;
+    if (!file) {
+        file = fopen(PROGRESS_FILE, "rb");
+        migrating = (file != NULL);
+    }
+
     if (!file) {
         if (!LevelMgr_SaveProgress(levelMgr)) {
             Engine_PushError("Error reading file \"progress.bin\".",
@@ -359,6 +376,10 @@ int LevelMgr_LoadProgress(LevelMgr *levelMgr) {
     }
 
     fclose(file);
+
+    if (migrating)
+        LevelMgr_SaveProgress(levelMgr);
+
     return 1;
 }
 
