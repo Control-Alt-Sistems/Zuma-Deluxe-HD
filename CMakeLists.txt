@@ -48,11 +48,33 @@ target_include_directories(
     ZumaHD PUBLIC
 
     "${PROJECT_SOURCE_DIR}/src"
+)
+
+# SYSTEM: warnings from these headers are not ours to fix
+target_include_directories(
+    ZumaHD SYSTEM PUBLIC
 
     "${PROJECT_SOURCE_DIR}/thirdparty/stb"
     "${PROJECT_SOURCE_DIR}/thirdparty/miniaudio"
     "${MINIAUDIO_LIBVORBIS_DIR}"
 )
+
+# compiler warnings, only for the game sources (not miniaudio_libvorbis.c or the deps)
+option(ZUMAHD_WARNINGS_AS_ERRORS "Treat compiler warnings in the game sources as errors" OFF)
+
+if(MSVC)
+    set(ZUMAHD_WARNING_FLAGS /W4)
+    if(ZUMAHD_WARNINGS_AS_ERRORS)
+        list(APPEND ZUMAHD_WARNING_FLAGS /WX)
+    endif()
+else()
+    set(ZUMAHD_WARNING_FLAGS -Wall -Wextra)
+    if(ZUMAHD_WARNINGS_AS_ERRORS)
+        list(APPEND ZUMAHD_WARNING_FLAGS -Werror)
+    endif()
+endif()
+
+set_source_files_properties(${SOURCES} PROPERTIES COMPILE_OPTIONS "${ZUMAHD_WARNING_FLAGS}")
 
 target_link_libraries(
     ZumaHD PRIVATE
