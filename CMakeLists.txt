@@ -98,6 +98,15 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(ZumaHD PRIVATE Threads::Threads m ${CMAKE_DL_LIBS})
 endif()
 
+# Windows: no console window, except in Debug builds (errors are shown in message boxes).
+# The game starts from main() (SDL_MAIN_HANDLED), so MSVC needs the console entry point.
+if(WIN32)
+    set_target_properties(ZumaHD PROPERTIES WIN32_EXECUTABLE $<NOT:$<CONFIG:Debug>>)
+    if(MSVC)
+        target_link_options(ZumaHD PRIVATE /ENTRY:mainCRTStartup)
+    endif()
+endif()
+
 # copy assets
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
