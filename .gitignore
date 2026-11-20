@@ -11,3 +11,6 @@ Makefile
 
 build/
 .cache/
+# settings.txt is ignored above, but build files and font data are not
+!CMakeLists.txt
+!content/fonts/*.txt
