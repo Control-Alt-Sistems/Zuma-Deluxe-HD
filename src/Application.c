@@ -103,6 +103,7 @@ static void ApplicationZuma_HandleEvents(App *app) {
 static void ApplicationZuma_Tick(LevelMgr *levelMgr, Engine *engine, App *app) {
   if (app->inMenu) {
     MenuMgr_Update(engine, &app->menuMgr);
+    MenuMgr_Animate(&app->menuMgr);
 
     if (app->menuMgr.roomID == MR_GAME && app->inMenu) {
       app->inMenu = 0;
@@ -191,8 +192,8 @@ int ApplicationZuma_Start(void) {
       continue;
     }
 
-    /* draw only after logic ran: some animations still advance inside the draw functions,
-       so drawing more often than 60 times per second would speed them up */
+    /* drawing changes no state, but without interpolation a frame drawn between two ticks
+       would be the same picture again, so draw only after logic ran */
     if (app.skipDraw)
       app.skipDraw = false;
     else

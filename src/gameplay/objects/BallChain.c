@@ -32,18 +32,25 @@ void Ball_InitAnim(Ball* ball) {
 		Animation_Set(&ball->anim, 0, 50, 0);
 }
 
-void Ball_Draw(Engine *engine, Ball* ball) {
+/* one logic tick of the ball's look: rolling frame, explosion and fade-in */
+void Ball_Update(Ball* ball) {
 	if (!ball->isExploding)
 		Animation_SetFrame(&ball->anim, ((int)ball->pos) % ball->anim.endFrame);
+	else
+		Animation_Update(&ball->anim);
 
 	if (ball->startAnim) {
-		ball->anim.color.a+=15;
-		if (ball->anim.color.a >= 255) {
+		/* alpha is a Uint8: check before adding so it cannot wrap around */
+		if (ball->anim.color.a >= 255 - 15) {
 			ball->anim.color.a = 255;
 			ball->startAnim = false;
+		} else {
+			ball->anim.color.a += 15;
 		}
 	}
+}
 
+void Ball_Draw(Engine *engine, Ball* ball) {
 	Animation_SetAngle(&ball->anim, ball->ang - 90);
 	Animation_Draw(engine, &ball->anim, ball->x, ball->y);
 }
@@ -541,6 +548,11 @@ void BallChain_Insert(Engine *engine, BallChain* ballChain, int idx, char color,
 	Engine_PlaySound(engine, SND_BALLCLICK2);
 	Ball_InitAnim(&ballChain->balls[idx]);
 	ballChain->len++;
+}
+
+void BallChain_UpdateAnims(BallChain* ballChain) {
+	for (int i = 0; i < ballChain->len; i++)
+		Ball_Update(&ballChain->balls[i]);
 }
 
 void BallChain_Draw(Engine *engine, BallChain* ballChain, bool priorBallsOnly) {

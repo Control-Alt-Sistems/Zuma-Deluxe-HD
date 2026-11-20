@@ -363,7 +363,7 @@ static bool _Game_IsGameLose(LevelMgr *levelMgr, Engine *engine, Game* game) {
 
 }
 
-void Game_Update(LevelMgr *levelMgr, Engine *engine, Game* game, int* inMenu, int mouseClicked) {
+static void _Game_UpdateLogic(LevelMgr *levelMgr, Engine *engine, Game* game, int* inMenu, int mouseClicked) {
     // Get mouse pos and rotate frog;
     Engine_GetMousePos(engine, &game->mx, &game->my);
     Frog_Rotate(&game->frog, game->mx, game->my);
@@ -439,6 +439,72 @@ void Game_Update(LevelMgr *levelMgr, Engine *engine, Game* game, int* inMenu, in
     Game_UpdateTreasure(engine, game);
 }
 
+/* true when Game_Draw shows the board (chain, bullets, treasure) and not an intro, outro or dialog */
+static bool _Game_IsBoardShown(Game* game) {
+    if (!game->isIntroEnded) return false;
+    if (game->isWon && !game->isOutroEnded) return false;
+    if (game->dbMenu || game->dbGameOver || game->dbStats) return false;
+    return true;
+}
+
+static void _Game_UpdateTreasureAnim(Game* game) {
+    /* Game_DrawTreasure draws the gem twice (shadow and gem), and drawing used to
+       advance the animation each time, so it advances twice per tick */
+    if (game->treasure.isActive) {
+        bool visible = true;
+        if (game->treasure.isBlinking) {
+            int delta = (int)(((float)(clock() - game->treasure.time))/(CLOCKS_PER_SEC / TREASURE_BLINK_SPEED));
+            visible = (delta % 2 == 0);
+        }
+        if (visible) {
+            Animation_Update(&game->treasure.anim);
+            Animation_Update(&game->treasure.anim);
+        }
+    }
+
+    if (game->treasure.isFading) {
+        game->treasure.anim.scale += TREASURE_FADING_SPEED;
+        Animation_Update(&game->treasure.anim);
+        Animation_Update(&game->treasure.anim);
+    }
+}
+
+/* advances everything Game_Draw shows, once per tick, so drawing changes nothing */
+static void _Game_UpdateAnims(Game* game) {
+    Frog_Update(&game->frog, game->isIntroEnded);
+
+    /* score gauge in the HUD, which every screen shows */
+    if (game->score < game->settings->gaugeScore) {
+        int targetW = 96 * game->score / game->settings->gaugeScore;
+        if (game->scoreRect.w < targetW)
+            game->scoreRect.w++;
+    } else {
+        game->scoreRect.y = 0;
+        game->scoreRect.w = 96;
+    }
+
+    if (game->dbStats && game->isOutroEnded) DialogueBox_UpdateSlide(game->dbStats);
+    DialogueBox_UpdateSlide(game->dbMenu);
+    DialogueBox_UpdateSlide(game->dbGameOver);
+
+    if (_Game_IsBoardShown(game)) {
+        BallChain_UpdateAnims(&game->chain);
+        _Game_UpdateTreasureAnim(game);
+    }
+}
+
+void Game_Update(LevelMgr *levelMgr, Engine *engine, Game* game, int* inMenu, int mouseClicked) {
+    /* set by the logic when the frog shoots, read by Frog_Update and Frog_Draw */
+    game->frog.isShooted = 0;
+
+    _Game_UpdateLogic(levelMgr, engine, game, inMenu, mouseClicked);
+
+    if (*inMenu)
+        return;
+
+    _Game_UpdateAnims(game);
+}
+
 void Game_Draw(LevelMgr *levelMgr, Engine *engine, Game* game) {
     Level_Draw(engine, game->lvl);
     Game_DrawFinish(engine, game);
@@ -484,10 +550,8 @@ void Game_Draw(LevelMgr *levelMgr, Engine *engine, Game* game) {
             Game_DrawTreasure(engine, game);
     }
 
-    if (game->treasure.isFading) {
-        game->treasure.anim.scale += TREASURE_FADING_SPEED;
+    if (game->treasure.isFading)
         Game_DrawTreasure(engine, game);
-    }
 
     if (game->DEBUG) {
         char buff[48];
@@ -642,15 +706,6 @@ void Game_DrawHUD(Engine *engine, Game* game) {
         Animation_Draw(engine, &anim, 57, 22);
         sprintf(buff, "x%d", game->lives);
         Engine_DrawText(engine, buff, FONT_CANCUN_FLOAT_14, 77, 12);
-    }
-
-    if (game->score < game->settings->gaugeScore) {
-        int targetW = 96 * game->score / game->settings->gaugeScore;
-        if (game->scoreRect.w < targetW)
-            game->scoreRect.w++;
-    } else {
-        game->scoreRect.y = 0;
-        game->scoreRect.w = 96;
     }
 
     Animation_Init(&anim, TEX_GAME_HUD, game->scoreRect);

@@ -35,26 +35,39 @@ void Frog_Rotate(Frog* frog, int mx, int my) {
 	frog->forwardY = vecY;
 }
 
-void Frog_Draw(Engine *engine, Frog* frog, bool introEnd) {
-	float frogX = frog->x;
-	float frogY = frog->y;
+/* one logic tick of the frog's recoil and blink; isShooted is set by the game this tick */
+void Frog_Update(Frog* frog, bool introEnd) {
+	/* the recoil of the previous tick is undone first, so the tick of the shot is drawn at full recoil */
+	if (frog->shift > 0)
+		frog->shift -= FROG_REVERT_SPEED;
+
+	if (frog->tongueShift > 0)
+		frog->tongueShift -= FROG_REVERT_SPEED * (FROG_TONGUE_SHIFT_ON_SHOOT / FROG_SHIFT_ON_SHOOT);
 
 	if (frog->isShooted) {
 		frog->shift = FROG_SHIFT_ON_SHOOT;
 		frog->tongueShift = FROG_TONGUE_SHIFT_ON_SHOOT;
+		Animation_Set(&frog->eyesAnim, 0, 3, FROG_BLINK_SPEED);
 	}
+
+	if (!introEnd)
+		frog->tongueShift = 24;
+
+	Animation_Update(&frog->eyesAnim);
+	if (frog->eyesAnim.frame == 0) {
+		Animation_Set(&frog->eyesAnim, 0, 3, 0);
+		Animation_SetFrame(&frog->eyesAnim, 0);
+	}
+}
+
+void Frog_Draw(Engine *engine, Frog* frog, bool introEnd) {
+	float frogX = frog->x;
+	float frogY = frog->y;
 
 	if (frog->shift > 0) {
 		frogX -= frog->forwardX * frog->shift;
 		frogY -= frog->forwardY * frog->shift;
-    	frog->shift -= FROG_REVERT_SPEED;
-    }
-
-    if (frog->tongueShift > 0)
-    	frog->tongueShift -= FROG_REVERT_SPEED * (FROG_TONGUE_SHIFT_ON_SHOOT / FROG_SHIFT_ON_SHOOT);
-
-	if (!introEnd)
-		frog->tongueShift = 24;
+	}
 
     Animation anim;
     //Drawing Foundation
@@ -97,17 +110,7 @@ void Frog_Draw(Engine *engine, Frog* frog, bool introEnd) {
 
 	//Drawing TopBodyLayer
 	anim.scale = 1;
-	if (frog->isShooted) {
-		Animation_Set(&frog->eyesAnim, 0, 3, FROG_BLINK_SPEED);
-	}
 
 	Animation_SetAngle(&frog->eyesAnim, frog->rotation);
 	Animation_Draw(engine, &frog->eyesAnim, frogX, frogY);
-
-	if (frog->eyesAnim.frame == 0) {
-		Animation_Set(&frog->eyesAnim, 0, 3, 0);
-		Animation_SetFrame(&frog->eyesAnim, 0);
-	}
-
-    frog->isShooted = 0;
 }
