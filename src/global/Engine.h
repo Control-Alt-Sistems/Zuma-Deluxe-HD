@@ -110,6 +110,7 @@ void Engine_StopSoundSfx(Engine*, int);
 
 void Engine_GetMousePos(Engine *engine, int* mx, int* my);
 
+void Engine_GetSavePath(char* out, size_t outSize, const char* fileName);
 int Engine_SaveSettings(Engine *engine);
 int Engine_LoadSettings(Engine *engine);
 

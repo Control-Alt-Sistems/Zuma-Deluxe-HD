@@ -55,16 +55,23 @@ git submodule update --init --recursive
 ### Build
 ```
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
+cmake --build build --parallel 4
 ```
 
 ### Run
-The game and the `content` folder are placed in `build/bin`. Run the game from this folder, because `settings.txt` and `progress.bin` are saved in the current folder:
+The game and the `content` folder are placed in `build/bin`:
 ```
 cd build/bin
 ./ZumaHD
 ```
 On Windows run `ZumaHD.exe`.
+
+`progress.bin` (best scores and times) and `settings.txt` (volume and fullscreen) are saved in your user data folder:
+* Windows: `%APPDATA%\GalaxyShad\ZumaHD\`
+* Linux: `~/.local/share/GalaxyShad/ZumaHD/`
+* macOS: `~/Library/Application Support/GalaxyShad/ZumaHD/`
+
+Files left in the current folder by an older version are read once and copied there.
 
 ## Contributing
 This is a hobby project, and any help is very welcome! I'm always happy to see pull requests - big or small.

@@ -53,7 +53,8 @@ void Animation_SetAngle(Animation* anim, float angle) {
 }
 
 
-void Animation_Draw(Engine *engine, Animation* anim, float x, float y) {
+/* advances the animation by one logic tick; drawing does not change it */
+void Animation_Update(Animation* anim) {
     if (!anim)
         return;
 
@@ -63,6 +64,11 @@ void Animation_Draw(Engine *engine, Animation* anim, float x, float y) {
 
     if (anim->frame < anim->startFrame && anim->spd != 0)
         anim->frame = anim->endFrame-1;
+}
+
+void Animation_Draw(Engine *engine, Animation* anim, float x, float y) {
+    if (!anim)
+        return;
 
     SDL_Texture* tex = Engine_GetTextureSDL(engine, anim->textureID);
     SDL_Rect frame = anim->framePos;

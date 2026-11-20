@@ -9,8 +9,11 @@
 #include "menu/MenuMgr.h"
 #include <stdio.h>
 
-#define MAX_FPS 60
-#define FRAME_DELAY 1000 / MAX_FPS
+/* the game logic was written for 60 updates per second, so it always runs at that rate */
+#define TICKS_PER_SECOND 60
+#define TICK_MS (1000.0 / TICKS_PER_SECOND)
+/* after a long stall (window drag, breakpoint) drop the backlog instead of fast-forwarding */
+#define MAX_TICKS_PER_FRAME 5
 
 Engine engine;
 
@@ -22,10 +25,9 @@ typedef struct {
   int curDifficulty;
 
   int inMenu;
-  int mouseClicked;
+  int mouseClicked; /* kept until a tick consumes it */
 
-  uint32_t frameStart;
-  int frameTime;
+  bool skipDraw; /* the game just went back to the menu: skip one draw, as before */
 
   bool isRunning;
 } App;
@@ -76,8 +78,6 @@ static int ApplicationZuma_ShowStartupImage(Engine *engine) {
 }
 
 static void ApplicationZuma_HandleEvents(App *app) {
-  app->mouseClicked = 0;
-
   SDL_Event e;
   while (SDL_PollEvent(&e) != 0) {
     switch (e.type) {
@@ -99,27 +99,34 @@ static void ApplicationZuma_HandleEvents(App *app) {
   }
 }
 
-static void ApplicationZuma_Update(LevelMgr *levelMgr, Engine *engine, App *app) {
-  SDL_RenderClear(engine->render);
-
+/* one fixed step of game logic (1/60 s) */
+static void ApplicationZuma_Tick(LevelMgr *levelMgr, Engine *engine, App *app) {
   if (app->inMenu) {
     MenuMgr_Update(engine, &app->menuMgr);
+    MenuMgr_Animate(&app->menuMgr);
 
     if (app->menuMgr.roomID == MR_GAME && app->inMenu) {
       app->inMenu = 0;
       Game_Init(levelMgr, engine, &app->game, app->curLvl, app->curDifficulty);
     }
-
-    MenuMgr_Draw(levelMgr, engine, &app->menuMgr);
   } else {
     Game_Update(levelMgr, engine, &app->game, &app->inMenu, app->mouseClicked);
     if (app->inMenu) {
       MenuMgr_Set(engine, &app->menuMgr, MR_GAUNTLET);
-      return;
+      app->skipDraw = true;
     }
-
-    Game_Draw(levelMgr, engine, &app->game);
   }
+
+  app->mouseClicked = 0;
+}
+
+static void ApplicationZuma_Draw(LevelMgr *levelMgr, Engine *engine, App *app) {
+  SDL_RenderClear(engine->render);
+
+  if (app->inMenu)
+    MenuMgr_Draw(levelMgr, engine, &app->menuMgr);
+  else
+    Game_Draw(levelMgr, engine, &app->game);
 
   SDL_RenderPresent(engine->render);
 }
@@ -151,22 +158,46 @@ int ApplicationZuma_Start(void) {
   app.curLvl = 0;
   app.curDifficulty = 0;
   app.inMenu = 1;
+  app.mouseClicked = 0;
+  app.skipDraw = false;
   app.isRunning = true;
 
   MenuMgr_Init(&app.menuMgr, &app.curLvl, &app.curDifficulty);
   MenuMgr_Set(&engine, &app.menuMgr, MR_MAIN);
 
+  const double counterToMs = 1000.0 / (double)SDL_GetPerformanceFrequency();
+  Uint64 prevCounter = SDL_GetPerformanceCounter();
+  double accumulatorMs = TICK_MS; /* run the first tick right away */
+
   while (app.isRunning) {
     ApplicationZuma_HandleEvents(&app);
 
-    app.frameStart = SDL_GetTicks();
+    Uint64 now = SDL_GetPerformanceCounter();
+    accumulatorMs += (double)(now - prevCounter) * counterToMs;
+    prevCounter = now;
 
-    ApplicationZuma_Update(&levelMgr, &engine, &app);
+    int ticks = 0;
+    while (accumulatorMs >= TICK_MS && ticks < MAX_TICKS_PER_FRAME && app.isRunning) {
+      ApplicationZuma_Tick(&levelMgr, &engine, &app);
+      accumulatorMs -= TICK_MS;
+      ticks++;
+    }
 
-    app.frameTime = SDL_GetTicks() - app.frameStart;
+    if (ticks == MAX_TICKS_PER_FRAME)
+      accumulatorMs = 0;
 
-    if (app.frameTime < FRAME_DELAY)
-      SDL_Delay(FRAME_DELAY - app.frameTime);
+    if (ticks == 0) {
+      /* nothing to simulate yet: give the CPU back until the next tick is due */
+      SDL_Delay(1);
+      continue;
+    }
+
+    /* drawing changes no state, but without interpolation a frame drawn between two ticks
+       would be the same picture again, so draw only after logic ran */
+    if (app.skipDraw)
+      app.skipDraw = false;
+    else
+      ApplicationZuma_Draw(&levelMgr, &engine, &app);
   }
 
   LevelMgr_Free(&levelMgr);

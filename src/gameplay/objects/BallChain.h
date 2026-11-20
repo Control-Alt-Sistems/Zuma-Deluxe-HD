@@ -59,6 +59,7 @@ typedef struct _BallChain {
 void Ball_Init(Ball*, float, float, float, char, char, char);
 void Ball_InitAnim(Ball*);
 void Ball_Copy(Ball*, Ball*);
+void Ball_Update(Ball*);
 void Ball_Draw(Engine *engine, Ball*);
 
 void BallChain_Init(BallChain*, Level*, LevelSettings*);
@@ -72,6 +73,7 @@ char BallChain_CollidesFront(BallChain*, int, int);
 char BallChain_CollidesBack(BallChain*, int, int);
 
 void BallChain_Update(Engine*, BallChain*, SpiralDot*, int, int*, Messages*);
+void BallChain_UpdateAnims(BallChain*);
 void BallChain_Draw(Engine*, BallChain*, bool);
 void BallChain_UpdateColorInChain(BallChain* chain);
 void BallChain_ExplodeBalls(Engine*, BallChain*, int, int);

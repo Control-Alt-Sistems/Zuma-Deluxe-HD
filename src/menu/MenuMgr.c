@@ -486,7 +486,10 @@ void DialogueBox_Update(Engine *engine, DialogueBox* db) {
 }
 
 
-void DialogueBox_Draw(Engine *engine, DialogueBox* db) {
+/* one logic tick of the slide-in started by DialogueBox_Animate */
+void DialogueBox_UpdateSlide(DialogueBox* db) {
+    if (!db)
+        return;
 
     if (db->animation) {
         if (db->pos.y > db->startY) {
@@ -510,7 +513,9 @@ void DialogueBox_Draw(Engine *engine, DialogueBox* db) {
             db->animation = false;
         }
     }
+}
 
+void DialogueBox_Draw(Engine *engine, DialogueBox* db) {
     SDL_Texture* texture = Engine_GetTextureSDL(engine, TEX_MENU);
 
     SDL_Point dPos;
@@ -903,15 +908,21 @@ void Menu_Update(Engine *engine, Menu* menu) {
 }
 
 
+/* shared by every menu room, as before */
+static int skyPos = 0;
+
+/* one logic tick of the menu background */
+void Menu_Animate(Menu* menu) {
+    if (menu->haveSky) {
+        skyPos += SKY_SPD;
+        skyPos %= 1280;
+    }
+}
+
 void Menu_Draw(Engine *engine, Menu* menu) {
     SDL_Texture* tex = Engine_GetTextureSDL(engine, TEX_MENU);
 
     if (menu->haveSky) {
-        static int skyPos = 0;
-        skyPos += SKY_SPD;
-
-        skyPos %= 1280;
-
         SDL_Rect dtrSky = {
             skyPos, 
             0, 
@@ -1121,7 +1132,13 @@ void MenuMgr_Update(Engine *engine, MenuMgr* m) {
                 m->inDialog = true;
                 break;
             case 4: break;          /* TODO NEVER GONNA GIVE YOU UP */
-            case 5: exit(0); break; 
+            case 5: {
+                /* same path as closing the window: the main loop ends and frees everything */
+                SDL_Event quit;
+                quit.type = SDL_QUIT;
+                SDL_PushEvent(&quit);
+                break;
+            }
         }
     } else if (m->roomID == MR_GAUNTLET) {
         switch(Menu_GetButton(m->room)) {
@@ -1161,6 +1178,15 @@ void MenuMgr_Update(Engine *engine, MenuMgr* m) {
     }
 }
 
+
+/* advances what MenuMgr_Draw shows; runs every tick, also while a dialog is open */
+void MenuMgr_Animate(MenuMgr* m) {
+    if (!m || m->roomID == MR_GAME)
+        return;
+
+    Menu_Animate(m->room);
+    DialogueBox_UpdateSlide(m->dbOptions);
+}
 
 void MenuMgr_Draw(LevelMgr *levelMgr, Engine *engine, MenuMgr* m) {
     if (m->roomID == MR_GAME) 

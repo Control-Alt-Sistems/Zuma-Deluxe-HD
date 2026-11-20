@@ -133,6 +133,7 @@ void DialogueBox_AddSlider(DialogueBox* db, Slider* s);
 void DialogueBox_AddText(DialogueBox* db, DialogueBoxText* text);
 void DialogueBox_SetTextStr(DialogueBox* db, int textID, const char* str);
 void DialogueBox_Animate(DialogueBox* db);
+void DialogueBox_UpdateSlide(DialogueBox* db);
 int DialogueBox_GetBtn(DialogueBox* db);
 void DialogueBox_Update(Engine *engine, DialogueBox* db);
 void DialogueBox_Draw(Engine *engine, DialogueBox* db);
@@ -185,6 +186,7 @@ void Menu_SetBgRect(Menu* menu, SDL_Rect rect);
 void Menu_SetSkyRect(Menu* menu, SDL_Rect rect);
 int  Menu_GetButton(Menu* menu);
 void Menu_Update(Engine *engine, Menu* menu);
+void Menu_Animate(Menu* menu);
 void Menu_Draw(Engine *engine, Menu* menu);
 void Menu_Destroy(Menu* menu);
 
@@ -208,6 +210,7 @@ typedef struct _MenuMgr {
 void MenuMgr_Init(MenuMgr* m, int* curLvl, int* curDiff);
 void MenuMgr_Set(Engine *engine, MenuMgr* m, int room);
 void MenuMgr_Update(Engine *engine, MenuMgr* m);
+void MenuMgr_Animate(MenuMgr* m);
 void MenuMgr_Draw(LevelMgr *levelMgr, Engine *engine, MenuMgr* m);
 
 

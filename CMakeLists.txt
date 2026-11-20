@@ -12,7 +12,8 @@ set(EXPAT_BUILD_TESTS OFF)
 set(EXPAT_BUILD_DOCS OFF)
 set(EXPAT_BUILD_TOOLS OFF)
 
-# deps sdl
+# deps sdl: the game links the shared SDL2 only, so don't build SDL twice
+set(SDL_STATIC OFF CACHE BOOL "" FORCE)
 add_subdirectory(thirdparty/expat/expat)
 add_subdirectory(thirdparty/sdl2)
 
@@ -48,11 +49,33 @@ target_include_directories(
     ZumaHD PUBLIC
 
     "${PROJECT_SOURCE_DIR}/src"
+)
+
+# SYSTEM: warnings from these headers are not ours to fix
+target_include_directories(
+    ZumaHD SYSTEM PUBLIC
 
     "${PROJECT_SOURCE_DIR}/thirdparty/stb"
     "${PROJECT_SOURCE_DIR}/thirdparty/miniaudio"
     "${MINIAUDIO_LIBVORBIS_DIR}"
 )
+
+# compiler warnings, only for the game sources (not miniaudio_libvorbis.c or the deps)
+option(ZUMAHD_WARNINGS_AS_ERRORS "Treat compiler warnings in the game sources as errors" OFF)
+
+if(MSVC)
+    set(ZUMAHD_WARNING_FLAGS /W4)
+    if(ZUMAHD_WARNINGS_AS_ERRORS)
+        list(APPEND ZUMAHD_WARNING_FLAGS /WX)
+    endif()
+else()
+    set(ZUMAHD_WARNING_FLAGS -Wall -Wextra)
+    if(ZUMAHD_WARNINGS_AS_ERRORS)
+        list(APPEND ZUMAHD_WARNING_FLAGS -Werror)
+    endif()
+endif()
+
+set_source_files_properties(${SOURCES} PROPERTIES COMPILE_OPTIONS "${ZUMAHD_WARNING_FLAGS}")
 
 target_link_libraries(
     ZumaHD PRIVATE
@@ -74,6 +97,15 @@ target_compile_definitions(
 if(UNIX AND NOT APPLE)
     find_package(Threads REQUIRED)
     target_link_libraries(ZumaHD PRIVATE Threads::Threads m ${CMAKE_DL_LIBS})
+endif()
+
+# Windows: no console window, except in Debug builds (errors are shown in message boxes).
+# The game starts from main() (SDL_MAIN_HANDLED), so MSVC needs the console entry point.
+if(WIN32)
+    set_target_properties(ZumaHD PROPERTIES WIN32_EXECUTABLE $<NOT:$<CONFIG:Debug>>)
+    if(MSVC)
+        target_link_options(ZumaHD PRIVATE /ENTRY:mainCRTStartup)
+    endif()
 endif()
 
 # copy assets
