@@ -154,6 +154,8 @@ void BallChain_Append(BallChain* ballChain, Level* lvl, LevelSettings* settings)
 		if (end - start + 1 < 4)
 			color = ballChain->balls[ballChain->len - 1].color;
 		else {
+			/* the run is already 4 long: pick any other color */
+			color = ballChain->balls[ballChain->len - 1].color;
 			while (color == ballChain->balls[ballChain->len - 1].color)
 					color = randInt(0, ballChain->ballColors - 1);
 		}

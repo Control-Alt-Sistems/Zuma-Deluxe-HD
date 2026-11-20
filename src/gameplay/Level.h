@@ -97,7 +97,7 @@ Stage* LevelMgr_GetStage(LevelMgr *levelMgr, int stageID);
 Level* LevelMgr_GetLevelFromStage(LevelMgr *levelMgr, int stageID, int lvID);
 LevelGraphics* LevelMgr_GetLevelGraphics(LevelMgr *levelMgr, Level* lv);
 LevelSettings* LevelMgr_GetLevelSettings(LevelMgr *levelMgr, Level* lv, int settingID);
-int LevelMgr_Free(LevelMgr *levelMgr);
+void LevelMgr_Free(LevelMgr *levelMgr);
 
 extern int xmlDepth;
 void XML_StartElement(void *data, const char *element, const char **attribute);

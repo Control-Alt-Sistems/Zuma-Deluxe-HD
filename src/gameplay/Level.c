@@ -396,7 +396,7 @@ LevelSettings* LevelMgr_GetLevelSettings(LevelMgr *levelMgr, Level* lv, int sett
     return &levelMgr->settings[lv->settingsID[settingID]];
 }
 
-int LevelMgr_Free(LevelMgr *levelMgr) {
+void LevelMgr_Free(LevelMgr *levelMgr) {
     for (int i = 0; i < levelMgr->graphicsLen; i++)
         free(levelMgr->graphics[i].coinsPos);
 
