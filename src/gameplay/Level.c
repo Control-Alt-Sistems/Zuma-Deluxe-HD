@@ -142,9 +142,9 @@ static void LevelParser_ParseStageProgression(
     for (int i = 0; attribute[i]; i += 2) {
         if (strncmp(attribute[i], "stage", 5) == 0) {
             char* cid = strtok((char*)attribute[i], "stage");
-            int stageID = atoi(cid)-1;
+            int stageID = cid ? atoi(cid)-1 : -1;
 
-            if (stageID > STAGE_COUNT) {
+            if (stageID < 0 || stageID >= STAGE_COUNT) {
                 continue;
             }
 
@@ -153,10 +153,6 @@ static void LevelParser_ParseStageProgression(
                 for (int i = 0; i < levelMgr->graphicsLen; i++) {
                     if (strcmp(gID, levelMgr->graphics[i].id) == 0) {
                         Stage* stage = &levelMgr->stages[stageID];
-
-                        if (stage->levels == NULL) {
-                            stage->levels = malloc(sizeof(Level) * (stage->levelsLen+1));
-                        }
 
                         Level* ptr = realloc(
                             stage->levels,
@@ -180,19 +176,26 @@ static void LevelParser_ParseStageProgression(
             }
         } else if (strncmp(attribute[i], "diffi", 5) == 0) {
             char* cid = strtok((char*)attribute[i], "diffi");
-            int stageID = atoi(cid)-1;
+            int stageID = cid ? atoi(cid)-1 : -1;
 
-            if (stageID > STAGE_COUNT) {
+            if (stageID < 0 || stageID >= STAGE_COUNT) {
                 continue;
             }
 
+            Stage* stage = &levelMgr->stages[stageID];
+
             char* sID = strtok((char*)attribute[i+1], ",");
             int j = 0;
-            while (sID) {
+            while (sID && j < stage->levelsLen) {
                 for (int i = 0; i < levelMgr->settingsLen; i++) {
                     if (strcmp(sID, levelMgr->settings[i].id) == 0) {
-                        Level* lv = &levelMgr->stages[stageID].levels[j];
-                        lv->settingsID  = malloc(sizeof(int));
+                        Level* lv = &stage->levels[j];
+                        int* ids = realloc(lv->settingsID, sizeof(int));
+                        if (!ids) {
+                            Engine_PushErrorFile("levels.xml", "Out of Memory!");
+                            return;
+                        }
+                        lv->settingsID = ids;
                         lv->settingsID[0] = i;
                         break;
                     }
@@ -256,21 +259,31 @@ int LevelMgr_LoadLevels(LevelMgr *levelMgr, const char* fileName) {
         return 0;
     }
 
-    FILE *fp = fopen(path, "r");
+    FILE *fp = fopen(path, "rb");
     if (!fp) {
-        Engine_PushErrorFile(path, "�� ������� ������� ����!");
+        Engine_PushErrorFile(path, "Could not open file!");
+        free(buff);
         return 0;
     }
 
     XML_Parser parser = XML_ParserCreate(NULL);
+    if (!parser) {
+        Engine_PushErrorFile(path, "Out of memory!");
+        free(buff);
+        fclose(fp);
+        return 0;
+    }
     XML_SetUserData(parser, levelMgr);
     XML_SetElementHandler(parser, XML_StartElement, XML_EndElement);
 
     do {
-        int len = (int)fread(buff, 1, sizeof(buff), fp);
-        done = len < sizeof(buff);
+        int len = (int)fread(buff, 1, XML_BUFF_SIZE, fp);
+        done = len < XML_BUFF_SIZE;
         if (XML_Parse(parser, buff, len, done) == XML_STATUS_ERROR) {
             Engine_PushErrorFile(path, XML_ErrorString(XML_GetErrorCode(parser)));
+            free(buff);
+            fclose(fp);
+            XML_ParserFree(parser);
             return 0;
         }
     } while(!done);
@@ -374,7 +387,7 @@ LevelGraphics* LevelMgr_GetLevelGraphics(LevelMgr *levelMgr, Level* lv) {
 }
 
 LevelSettings* LevelMgr_GetLevelSettings(LevelMgr *levelMgr, Level* lv, int settingID) {
-    if (!lv)
+    if (!lv || !lv->settingsID)
         return NULL;
 
     if (settingID < 0)
