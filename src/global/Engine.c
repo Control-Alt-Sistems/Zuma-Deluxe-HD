@@ -692,12 +692,25 @@ float lerp(float start, float end, float val) {
 }
 
 // ==== Saved data ==== //
+
+#define SETTINGS_FILE "settings.txt"
+
+/* path of a save file in the user's data folder (e.g. %APPDATA%\GalaxyShad\ZumaHD\ on Windows,
+   ~/.local/share/GalaxyShad/ZumaHD/ on Linux). Falls back to the current folder if SDL has none. */
+void Engine_GetSavePath(char* out, size_t outSize, const char* fileName) {
+    char* prefPath = SDL_GetPrefPath("GalaxyShad", "ZumaHD");
+    SDL_snprintf(out, outSize, "%s%s", prefPath ? prefPath : "", fileName);
+    SDL_free(prefPath);
+}
+
 int Engine_SaveSettings(Engine *engine) {
+    char path[512];
+    Engine_GetSavePath(path, sizeof(path), SETTINGS_FILE);
+
     FILE* file;
-    file = fopen("settings.txt", "w");
+    file = fopen(path, "w");
     if (!file) {
-        Engine_PushError("File save error",
-            "Unable to write file \"settings.txt\"");
+        Engine_PushErrorFile(path, "Unable to write file.");
         return 0;
     }
 
@@ -714,8 +727,20 @@ int Engine_SaveSettings(Engine *engine) {
 }
 
 int Engine_LoadSettings(Engine *engine) {
+    char path[512];
+    Engine_GetSavePath(path, sizeof(path), SETTINGS_FILE);
+
     FILE* file;
-    file = fopen("settings.txt", "r");
+    file = fopen(path, "r");
+
+    /* older versions saved settings.txt in the current folder: read it once,
+       the save at the end writes it to the new place */
+    bool migrating = false;
+    if (!file) {
+        file = fopen(SETTINGS_FILE, "r");
+        migrating = (file != NULL);
+    }
+
     if (!file) {
         Engine_SaveSettings(engine);
         return 1;
@@ -779,5 +804,9 @@ int Engine_LoadSettings(Engine *engine) {
     }
 
     fclose(file);
+
+    if (migrating)
+        Engine_SaveSettings(engine);
+
     return 1;
 }

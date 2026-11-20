@@ -59,12 +59,19 @@ cmake --build build --parallel
 ```
 
 ### Run
-The game and the `content` folder are placed in `build/bin`. Run the game from this folder, because `settings.txt` and `progress.bin` are saved in the current folder:
+The game and the `content` folder are placed in `build/bin`. Run the game from this folder, because `progress.bin` is saved in the current folder:
 ```
 cd build/bin
 ./ZumaHD
 ```
 On Windows run `ZumaHD.exe`.
+
+`settings.txt` (volume and fullscreen) is saved in your user data folder:
+* Windows: `%APPDATA%\GalaxyShad\ZumaHD\`
+* Linux: `~/.local/share/GalaxyShad/ZumaHD/`
+* macOS: `~/Library/Application Support/GalaxyShad/ZumaHD/`
+
+A `settings.txt` left in the game folder by an older version is read once and copied there.
 
 ## Contributing
 This is a hobby project, and any help is very welcome! I'm always happy to see pull requests - big or small.
