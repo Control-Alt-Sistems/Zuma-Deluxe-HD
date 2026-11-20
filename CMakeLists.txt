@@ -12,7 +12,8 @@ set(EXPAT_BUILD_TESTS OFF)
 set(EXPAT_BUILD_DOCS OFF)
 set(EXPAT_BUILD_TOOLS OFF)
 
-# deps sdl
+# deps sdl: the game links the shared SDL2 only, so don't build SDL twice
+set(SDL_STATIC OFF CACHE BOOL "" FORCE)
 add_subdirectory(thirdparty/expat/expat)
 add_subdirectory(thirdparty/sdl2)
 

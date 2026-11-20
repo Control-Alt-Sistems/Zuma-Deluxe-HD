@@ -50,7 +50,8 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release ${{ matrix.configure-args }}
 
       - name: Build
-        run: cmake --build build --config Release --parallel
+        # a fixed job count: plain --parallel lets make start unlimited jobs and the runner runs out of memory
+        run: cmake --build build --config Release --parallel 4
 
       - name: Upload game
         uses: actions/upload-artifact@v4
