@@ -5,7 +5,7 @@ void Message_Init(Message* msg, char* text, float x, float y, char font, char co
 	msg->y = y;
 	msg->color = color;
 	msg->font = font;
-	sprintf(msg->text, "%s", text);
+	SDL_strlcpy(msg->text, text, sizeof(msg->text));
 
 	msg->onScreen = true;
 	msg->spd = MSG_SPD;

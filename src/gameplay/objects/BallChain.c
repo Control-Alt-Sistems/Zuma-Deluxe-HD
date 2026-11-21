@@ -235,11 +235,11 @@ void BallChain_Update(Engine *engine, BallChain* ballChain, SpiralDot* spiral, i
 							*score = *score + score_delta;
 							char txt[MAX_MSG_LEN];
 							if (combo) {
-								sprintf(txt, "+%d\nCOMBO x%d", score_delta, combo);
+								SDL_snprintf(txt, sizeof(txt), "+%d\nCOMBO x%d", score_delta, combo);
     							// NEW
 								ballChain->totalCombos++;
 							}else
-								sprintf(txt, "+%d", score_delta);
+								SDL_snprintf(txt, sizeof(txt), "+%d", score_delta);
 
 							if (combo > ballChain->maxCombo) ballChain->maxCombo = combo;
 
@@ -321,9 +321,9 @@ void BallChain_Update(Engine *engine, BallChain* ballChain, SpiralDot* spiral, i
 
 						char txt[MAX_MSG_LEN];
 						if (ballChain->chainBonus >= 5)
-							sprintf(txt, "+%d\nCHAIN BONUS x%d", score_delta, ballChain->chainBonus);
+							SDL_snprintf(txt, sizeof(txt), "+%d\nCHAIN BONUS x%d", score_delta, ballChain->chainBonus);
 						else
-							sprintf(txt, "+%d", score_delta);
+							SDL_snprintf(txt, sizeof(txt), "+%d", score_delta);
 						float x = ballChain->balls[(int)(end - ((end - start + 1) / 2))].x;
 						float y = ballChain->balls[(int)(end - ((end - start + 1) / 2))].y;
 						Messages_NewMsg(msgs, txt, x, y, FONT_CANCUN_FLOAT_14, ballChain->balls[start].color);
@@ -356,9 +356,9 @@ void BallChain_Update(Engine *engine, BallChain* ballChain, SpiralDot* spiral, i
 
 				char txt[MAX_MSG_LEN];
 				if (ballChain->chainBonus >= 5)
-					sprintf(txt, "+%d\nCHAIN BONUS x%d", score_delta, ballChain->chainBonus);
+					SDL_snprintf(txt, sizeof(txt), "+%d\nCHAIN BONUS x%d", score_delta, ballChain->chainBonus);
 				else
-					sprintf(txt, "+%d", score_delta);
+					SDL_snprintf(txt, sizeof(txt), "+%d", score_delta);
 				float x = ballChain->balls[(int)(end - ((end - start + 1) / 2))].x;
 				float y = ballChain->balls[(int)(end - ((end - start + 1) / 2))].y;
 				Messages_NewMsg(msgs, txt, x, y, FONT_CANCUN_FLOAT_14, ballChain->balls[start].color);

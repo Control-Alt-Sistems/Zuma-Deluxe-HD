@@ -11,7 +11,7 @@
 // ==== Common ==== //
 void Engine_PushError(const char* header, const char* main) {
     char errMsg[STR_ERR_BUFFER_SIZE];
-    sprintf(errMsg, "%s\n%s", header, main);
+    SDL_snprintf(errMsg, sizeof(errMsg), "%s\n%s", header, main);
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
                              "Error",
                              errMsg,
@@ -20,7 +20,7 @@ void Engine_PushError(const char* header, const char* main) {
 
 void Engine_PushErrorCode(const char* header, int code) {
     char errMsg[STR_ERR_BUFFER_SIZE];
-    sprintf(errMsg, "%s\nError code: %d", header, code);
+    SDL_snprintf(errMsg, sizeof(errMsg), "%s\nError code: %d", header, code);
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
                              "Error",
                              errMsg,
@@ -29,8 +29,9 @@ void Engine_PushErrorCode(const char* header, int code) {
 
 void Engine_PushErrorFile(const char* file, const char* main) {
     char pathMsg[STR_ERR_BUFFER_SIZE];
-    sprintf(
+    SDL_snprintf(
         pathMsg,
+        sizeof(pathMsg),
         "Error loading file \"%s\".",
         file
     );
@@ -39,8 +40,9 @@ void Engine_PushErrorFile(const char* file, const char* main) {
 
 void Engine_PushErrorFileCode(const char* file, int code) {
     char pathMsg[STR_ERR_BUFFER_SIZE];
-    sprintf(
+    SDL_snprintf(
         pathMsg,
+        sizeof(pathMsg),
         "Error loading file \"%s\".",
         file
     );

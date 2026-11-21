@@ -74,7 +74,8 @@ typedef struct _Game {
 
 
 
-void Game_Init(LevelMgr*, Engine*, Game*, int, int);
+/* false when the level files could not be loaded (an error was shown) */
+bool Game_Init(LevelMgr*, Engine*, Game*, int, int);
 
 void Game_Update(LevelMgr*, Engine*, Game*, int*, int);
 void Game_UpdateTreasure(Engine*, Game*);

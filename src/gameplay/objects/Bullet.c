@@ -73,7 +73,8 @@ void BulletsArr_AddBullet(BulletsArr* bulletsArr, Frog* frog) {
 	bulletsArr->len++;
 }
 
-char Bullet_isInsertInBack(Engine *engine, Bullet* bullet, Ball* ball, SpiralDot* spiral) {
+/* true when the bullet is closer to the point one ball behind than to the point one ball ahead */
+char Bullet_isInsertInBack(Engine *engine, Bullet* bullet, Ball* ball, SpiralDot* spiral, int spiralLen) {
 	float x1 = ball->x;
 	float y1 = ball->y;
 	float pos1 = ball->pos;
@@ -82,7 +83,8 @@ char Bullet_isInsertInBack(Engine *engine, Bullet* bullet, Ball* ball, SpiralDot
 	float y2 = ball->y;
 	float pos2 = ball->pos;
 
-	while (pos1 - ball->pos < BALLS_CHAIN_PAD) {
+	/* stop at the end of the path: a ball next to the hole has no point ahead */
+	while (pos1 - ball->pos < BALLS_CHAIN_PAD && (int)pos1 < spiralLen) {
 		x1 += spiral[(int)pos1].dx * engine->scale_x * 0.5;
 		y1 += spiral[(int)pos1].dy * engine->scale_y * 0.5;
 
@@ -90,7 +92,7 @@ char Bullet_isInsertInBack(Engine *engine, Bullet* bullet, Ball* ball, SpiralDot
 	}
 
 	while (ball->pos - pos2 < BALLS_CHAIN_PAD) {
-		if (pos2 < 0) return 0;
+		if (pos2 < 0 || (int)pos2 >= spiralLen) return 0;
 		x2 -= spiral[(int)pos2].dx * engine->scale_x * 0.5;
 		y2 -= spiral[(int)pos2].dy * engine->scale_y * 0.5;
 
@@ -123,7 +125,7 @@ int Bullet_IsCollidingWithChain(Bullet* bullet, BallChain* ballChain) {
 	return -1;
 }
 
-void BulletsArr_CollideWithChainUpdate(Engine *engine, BulletsArr* bulletsArr, BallChain* ballChain, SpiralDot* spiral) {
+void BulletsArr_CollideWithChainUpdate(Engine *engine, BulletsArr* bulletsArr, BallChain* ballChain, SpiralDot* spiral, int spiralLen) {
 	for (int i = 0; i < bulletsArr->len; i++) {
 		if (!bulletsArr->bullets[i].onScreen) continue;
 
@@ -135,7 +137,7 @@ void BulletsArr_CollideWithChainUpdate(Engine *engine, BulletsArr* bulletsArr, B
 			char isInsertBack = Bullet_isInsertInBack(
 				engine,
 				&bulletsArr->bullets[i], 
-				&ballChain->balls[collBall], spiral);
+				&ballChain->balls[collBall], spiral, spiralLen);
 
 			collBall = collBall + isInsertBack;
 

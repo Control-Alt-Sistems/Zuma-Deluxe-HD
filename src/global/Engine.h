@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#define STR_ERR_BUFFER_SIZE 128
+#define STR_ERR_BUFFER_SIZE 1024
 #define STR_PATH_BUFFER_SIZE 48
 
 #define TEXTURE_FOLDER "images"

@@ -29,7 +29,7 @@ void Button_Init(Button* btn) {
 
 
 void Button_SetText(Button* btn, const char* str) {
-    strcpy(btn->text, str);
+    SDL_strlcpy(btn->text, str, sizeof(btn->text));
     btn->withText = true;
 }
 
@@ -438,7 +438,7 @@ void DialogueBox_SetTextStr(DialogueBox* db, int textID, const char* str) {
     if (textID < 0 || textID >= db->textsLen)
         return;
 
-    strcpy(db->texts[textID].str, str);
+    SDL_strlcpy(db->texts[textID].str, str, sizeof(db->texts[textID].str));
 }
 
 
@@ -1229,16 +1229,16 @@ void MenuMgr_Draw(LevelMgr *levelMgr, Engine *engine, MenuMgr* m) {
         char buff[32];
         SDL_Color color = {255, 255, 255, 255};
 
-        sprintf(buff, "BEST SCORE:");
+        SDL_snprintf(buff, sizeof(buff), "BEST SCORE:");
         Engine_DrawTextExt(engine, buff, FONT_CANCUN_10, color, true,
             false, 924, 632);
 
-        sprintf(buff, "%d", levelMgr->bestScore[*m->curLvl][*m->curDiff]);
+        SDL_snprintf(buff, sizeof(buff), "%d", levelMgr->bestScore[*m->curLvl][*m->curDiff]);
         color.b = 0;
         Engine_DrawTextExt(engine, buff, FONT_CANCUN_10, color, true,
             false, 1140, 632);
 
-        sprintf(buff, "BEST TIME:");
+        SDL_snprintf(buff, sizeof(buff), "BEST TIME:");
         color.b = 255;
         Engine_DrawTextExt(engine, buff, FONT_CANCUN_10, color, true,
             false, 924, 686);
@@ -1246,7 +1246,7 @@ void MenuMgr_Draw(LevelMgr *levelMgr, Engine *engine, MenuMgr* m) {
         int min, sec;
         min = levelMgr->bestTime[*m->curLvl][*m->curDiff] / 60;
         sec = levelMgr->bestTime[*m->curLvl][*m->curDiff] % 60;
-        sprintf(buff, "%d:%02d", min, sec);
+        SDL_snprintf(buff, sizeof(buff), "%d:%02d", min, sec);
         color.b = 0;
         Engine_DrawTextExt(engine, buff, FONT_CANCUN_10, color, true,
             false, 1140, 686);
